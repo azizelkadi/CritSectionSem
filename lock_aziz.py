@@ -1,45 +1,34 @@
-from multiprocessing import Process
+from multiprocessing import Process, Lock
 from multiprocessing import current_process
 from multiprocessing import Value, Array
+import random
+import time
 
 N = 8
 
-def is_anybody_inside(critical, tid):
-    found = False
-    i = 0
-    while i<len(critical) and not found:
-        found = tid!=i and critical[i]==1
-        i += 1
-    return found
-
-def task(common, tid, critical, turn):
+def task(semaphore, common, tid):
     a = 0
-    for i in range(100):
+    for i in range(5):
         print(f'{tid}-{i}: Non-critical Section')
         a += 1
+        time.sleep(random.random())
         print(f'{tid}-{i}: End of non-critical Section')
-        critical[tid] = 1
-        while is_anybody_inside(critical, tid):
-            critical[tid] = 0
-            print(f'{tid}-{i}: Giving up')
-            while turn.value==tid:
-                pass
-        critical[tid] = 1
+
+        semaphore.acquire()
         print(f'{tid}-{i}: Critical section')
         v = common.value + 1
         print(f'{tid}-{i}: Inside critical section')
+        time.sleep(random.random())
         common.value = v
         print(f'{tid}-{i}: End of critical section')
-        critical[tid] = 0
-        turn.value = tid
+        semaphore.release()
 
 def main():
+    semaphore = Lock()
     lp = []
     common = Value('i', 0)
-    critical = Array('i', [0]*N)
-    turn = Value('i', 0)
     for tid in range(N):
-        lp.append(Process(target=task, args=(common, tid, critical, turn)))
+        lp.append(Process(target=task, args=(semaphore, common, tid)))
     print (f"Valor inicial del contador {common.value}")
     for p in lp:
         p.start()
